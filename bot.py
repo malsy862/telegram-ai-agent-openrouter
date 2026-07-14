@@ -14,7 +14,8 @@ client = OpenAI(
     api_key=os.getenv("GROQ_API_KEY")
 )
 
-MODEL = "llama-3.1-70b-versatile"
+# Model yang masih aktif
+MODEL = "llama3-70b-8192"
 
 # Database permanen
 Base = declarative_base()
@@ -32,54 +33,10 @@ Base.metadata.create_all(engine)
 
 # ================== BOT ==================
 async def start(update: Update, context):
-    await update.message.reply_text("✅ Bot Groq Llama 3.1 70B aktif!\nTanya apa saja ya 😊")
+    await update.message.reply_text("✅ Bot Groq Llama3 70B aktif!\nTanya apa saja ya 😊")
 
 async def balas(update: Update, context):
     user_id = update.effective_user.id
     teks = update.message.text
 
-    await update.message.reply_text("⏳ Sedang berpikir...")  # feedback
-
-    session = Session()
-    lama = session.query(Ingatan).filter_by(user_id=user_id).all()
-    history = [{"role": x.role, "content": x.pesan} for x in lama]
-    history.append({"role": "user", "content": teks})
-
-    try:
-        response = client.chat.completions.create(
-            model=MODEL,
-            messages=history[-12:],   # dikurangi biar lebih ringan
-            temperature=0.7,
-            max_tokens=600,
-        )
-        jawaban = response.choices[0].message.content
-    except Exception as e:
-        error_msg = str(e)
-        print(f"Groq Error: {error_msg}")
-        jawaban = f"Error: {error_msg[:300]}"
-
-    # Simpan ke database
-    session.add(Ingatan(user_id=user_id, role="user", pesan=teks))
-    session.add(Ingatan(user_id=user_id, role="assistant", pesan=jawaban))
-    session.commit()
-    session.close()
-
-    await update.message.reply_text(jawaban)
-
-# ================== JALANKAN ==================
-if __name__ == "__main__":
-    TOKEN = os.getenv("TELEGRAM_TOKEN") or os.getenv("BOT_TOKEN")
-    if not TOKEN:
-        print("❌ Token Telegram tidak ditemukan!")
-        exit(1)
-    
-    if not os.getenv("GROQ_API_KEY"):
-        print("❌ GROQ_API_KEY tidak ditemukan!")
-
-    print("🤖 Bot Groq sedang berjalan...")
-    app = Application.builder().token(TOKEN).build()
-    
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, balas))
-    
-    app.run_polling()
+    await update.message.reply​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​​
