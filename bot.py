@@ -5,7 +5,6 @@ from telegram.ext import Application, MessageHandler, filters, CommandHandler
 from openai import OpenAI
 from sqlalchemy import create_engine, Column, Integer, String, Text
 from sqlalchemy.orm import sessionmaker, declarative_base
-from datetime import datetime
 
 load_dotenv()
 
@@ -15,7 +14,7 @@ client = OpenAI(
     api_key=os.getenv("GROQ_API_KEY")
 )
 
-MODEL = "llama-3.1-70b-versatile"   # bagus & cepat
+MODEL = "llama-3.1-70b-versatile"
 
 # Database permanen
 Base = declarative_base()
@@ -39,6 +38,8 @@ async def balas(update: Update, context):
     user_id = update.effective_user.id
     teks = update.message.text
 
+    await update.message.reply_text("⏳ Sedang berpikir...")  # feedback
+
     session = Session()
     lama = session.query(Ingatan).filter_by(user_id=user_id).all()
     history = [{"role": x.role, "content": x.pesan} for x in lama]
@@ -47,16 +48,17 @@ async def balas(update: Update, context):
     try:
         response = client.chat.completions.create(
             model=MODEL,
-            messages=history[-20:],
+            messages=history[-12:],   # dikurangi biar lebih ringan
             temperature=0.7,
-            max_tokens=800,
+            max_tokens=600,
         )
         jawaban = response.choices[0].message.content
     except Exception as e:
-        print(f"Groq Error: {e}")
-        jawaban = "Maaf, sedang sibuk. Coba lagi ya."
+        error_msg = str(e)
+        print(f"Groq Error: {error_msg}")
+        jawaban = f"Error: {error_msg[:300]}"
 
-    # Simpan permanen
+    # Simpan ke database
     session.add(Ingatan(user_id=user_id, role="user", pesan=teks))
     session.add(Ingatan(user_id=user_id, role="assistant", pesan=jawaban))
     session.commit()
@@ -70,8 +72,11 @@ if __name__ == "__main__":
     if not TOKEN:
         print("❌ Token Telegram tidak ditemukan!")
         exit(1)
+    
+    if not os.getenv("GROQ_API_KEY"):
+        print("❌ GROQ_API_KEY tidak ditemukan!")
 
-    print("🤖 Bot Groq sedang jalan...")
+    print("🤖 Bot Groq sedang berjalan...")
     app = Application.builder().token(TOKEN).build()
     
     app.add_handler(CommandHandler("start", start))
