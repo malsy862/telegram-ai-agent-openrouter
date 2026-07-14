@@ -2,26 +2,20 @@ import os
 from dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import Application, MessageHandler, filters, CommandHandler
-import openai
+from openai import OpenAI
 from sqlalchemy import create_engine, Column, Integer, String, Text
 from sqlalchemy.orm import sessionmaker, declarative_base
 from datetime import datetime
 
 load_dotenv()
 
-# ================== PENGATURAN ==================
-openai.api_base = "https://openrouter.ai/api/v1"
-openai.api_key = os.getenv("OPENROUTER_API_KEY")
+# ================== GROQ ==================
+client = OpenAI(
+    base_url="https://api.groq.com/openai/v1",
+    api_key=os.getenv("GROQ_API_KEY")
+)
 
-# Model gratis terbaik
-MODEL = "tencent/hy3:free"
-
-# Ambil token dengan fleksibel (bisa TELEGRAM_TOKEN atau BOT_TOKEN)
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN") or os.getenv("BOT_TOKEN")
-
-if not TELEGRAM_TOKEN:
-    print("❌ ERROR: TELEGRAM_TOKEN atau BOT_TOKEN tidak ditemukan di Variables Railway!")
-    exit(1)
+MODEL = "llama-3.1-70b-versatile"   # bagus & cepat
 
 # Database permanen
 Base = declarative_base()
@@ -39,27 +33,28 @@ Base.metadata.create_all(engine)
 
 # ================== BOT ==================
 async def start(update: Update, context):
-    await update.message.reply_text("✅ Bot Tencent Hy3 aktif!\nSilakan tanya apa saja 😊")
+    await update.message.reply_text("✅ Bot Groq Llama 3.1 70B aktif!\nTanya apa saja ya 😊")
 
 async def balas(update: Update, context):
     user_id = update.effective_user.id
     teks = update.message.text
 
     session = Session()
-
     lama = session.query(Ingatan).filter_by(user_id=user_id).all()
     history = [{"role": x.role, "content": x.pesan} for x in lama]
     history.append({"role": "user", "content": teks})
 
     try:
-        response = openai.ChatCompletion.create(
+        response = client.chat.completions.create(
             model=MODEL,
             messages=history[-20:],
             temperature=0.7,
+            max_tokens=800,
         )
         jawaban = response.choices[0].message.content
     except Exception as e:
-        jawaban = "Maaf, sedang ada masalah. Coba lagi ya."
+        print(f"Groq Error: {e}")
+        jawaban = "Maaf, sedang sibuk. Coba lagi ya."
 
     # Simpan permanen
     session.add(Ingatan(user_id=user_id, role="user", pesan=teks))
@@ -69,15 +64,17 @@ async def balas(update: Update, context):
 
     await update.message.reply_text(jawaban)
 
-# ================== JALANKAN BOT ==================
+# ================== JALANKAN ==================
 if __name__ == "__main__":
-    print("🤖 Bot sedang starting...")
-    print(f"Model: {MODEL}")
-    
-    app = Application.builder().token(TELEGRAM_TOKEN).build()
+    TOKEN = os.getenv("TELEGRAM_TOKEN") or os.getenv("BOT_TOKEN")
+    if not TOKEN:
+        print("❌ Token Telegram tidak ditemukan!")
+        exit(1)
+
+    print("🤖 Bot Groq sedang jalan...")
+    app = Application.builder().token(TOKEN).build()
     
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, balas))
     
-    print("✅ Bot berhasil jalan!")
     app.run_polling()
