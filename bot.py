@@ -16,6 +16,13 @@ openai.api_key = os.getenv("OPENROUTER_API_KEY")
 # Model gratis terbaik
 MODEL = "tencent/hy3:free"
 
+# Ambil token dengan fleksibel (bisa TELEGRAM_TOKEN atau BOT_TOKEN)
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN") or os.getenv("BOT_TOKEN")
+
+if not TELEGRAM_TOKEN:
+    print("❌ ERROR: TELEGRAM_TOKEN atau BOT_TOKEN tidak ditemukan di Variables Railway!")
+    exit(1)
+
 # Database permanen
 Base = declarative_base()
 engine = create_engine('sqlite:///bot_memory.db')
@@ -25,14 +32,14 @@ class Ingatan(Base):
     __tablename__ = 'ingatan'
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer)
-    role = Column(String)      # user / assistant
+    role = Column(String)
     pesan = Column(Text)
 
 Base.metadata.create_all(engine)
 
 # ================== BOT ==================
 async def start(update: Update, context):
-    await update.message.reply_text("✅ Bot sudah aktif pakai Tencent Hy3 (free)!\nTanya apa saja ya 😊")
+    await update.message.reply_text("✅ Bot Tencent Hy3 aktif!\nSilakan tanya apa saja 😊")
 
 async def balas(update: Update, context):
     user_id = update.effective_user.id
@@ -40,23 +47,21 @@ async def balas(update: Update, context):
 
     session = Session()
 
-    # Ambil history lama
     lama = session.query(Ingatan).filter_by(user_id=user_id).all()
     history = [{"role": x.role, "content": x.pesan} for x in lama]
     history.append({"role": "user", "content": teks})
 
-    # Kirim ke Tencent Hy3
     try:
         response = openai.ChatCompletion.create(
             model=MODEL,
-            messages=history[-20:],   # maksimal 20 pesan terakhir
+            messages=history[-20:],
             temperature=0.7,
         )
         jawaban = response.choices[0].message.content
     except Exception as e:
-        jawaban = "Maaf, ada error. Coba lagi ya."
+        jawaban = "Maaf, sedang ada masalah. Coba lagi ya."
 
-    # Simpan ke database permanen
+    # Simpan permanen
     session.add(Ingatan(user_id=user_id, role="user", pesan=teks))
     session.add(Ingatan(user_id=user_id, role="assistant", pesan=jawaban))
     session.commit()
@@ -64,12 +69,15 @@ async def balas(update: Update, context):
 
     await update.message.reply_text(jawaban)
 
-# ================== JALANKAN ==================
+# ================== JALANKAN BOT ==================
 if __name__ == "__main__":
-    app = Application.builder().token(os.getenv("TELEGRAM_TOKEN")).build()
+    print("🤖 Bot sedang starting...")
+    print(f"Model: {MODEL}")
+    
+    app = Application.builder().token(TELEGRAM_TOKEN).build()
     
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, balas))
     
-    print("🤖 Bot Tencent Hy3 sedang berjalan...")
+    print("✅ Bot berhasil jalan!")
     app.run_polling()
