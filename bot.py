@@ -8,15 +8,13 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 
 load_dotenv()
 
-# GROQ SETUP
 client = OpenAI(
     base_url="https://api.groq.com/openai/v1",
     api_key=os.getenv("GROQ_API_KEY")
 )
 
-MODEL = "llama3-70b-8192"
+MODEL = "llama3-70b-8192"   # <-- Model ini yang aktif
 
-# Database permanen
 Base = declarative_base()
 engine = create_engine('sqlite:///bot_memory.db')
 Session = sessionmaker(bind=engine)
@@ -30,9 +28,8 @@ class Ingatan(Base):
 
 Base.metadata.create_all(engine)
 
-# BOT
 async def start(update: Update, context):
-    await update.message.reply_text("✅ Bot Groq Llama3 70B aktif!\nTanya apa saja ya 😊")
+    await update.message.reply_text("✅ Bot Groq aktif dengan Llama3 70B!\nTanya apa saja.")
 
 async def balas(update: Update, context):
     user_id = update.effective_user.id
@@ -54,7 +51,7 @@ async def balas(update: Update, context):
         )
         jawaban = response.choices[0].message.content
     except Exception as e:
-        print(f"Groq Error: {str(e)}")
+        print(f"Error: {str(e)}")
         jawaban = "Maaf, ada masalah. Coba lagi ya."
 
     session.add(Ingatan(user_id=user_id, role="user", pesan=teks))
@@ -64,17 +61,10 @@ async def balas(update: Update, context):
 
     await update.message.reply_text(jawaban)
 
-# JALANKAN
 if __name__ == "__main__":
     TOKEN = os.getenv("TELEGRAM_TOKEN") or os.getenv("BOT_TOKEN")
-    if not TOKEN:
-        print("❌ Token Telegram tidak ditemukan!")
-        exit(1)
-    
-    print(f"🤖 Bot Groq jalan dengan model: {MODEL}")
+    print("Bot mulai...")
     app = Application.builder().token(TOKEN).build()
-    
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, balas))
-    
     app.run_polling()
